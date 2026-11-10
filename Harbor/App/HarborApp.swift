@@ -4,6 +4,7 @@ import SwiftUI
 struct HarborApp: App {
     @State private var store: AppStore
     @State private var sessions: SessionManager
+    @State private var navigator = Navigator()
 
     init() {
         let store = AppStore()
@@ -16,6 +17,7 @@ struct HarborApp: App {
             RootView()
                 .environment(store)
                 .environment(sessions)
+                .environment(navigator)
                 .tint(Theme.accent)
                 .preferredColorScheme(.dark)
         }

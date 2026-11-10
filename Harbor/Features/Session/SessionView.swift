@@ -1,18 +1,15 @@
 import SwiftUI
 
-/// The live terminal for one session, with a status header, a quick key bar,
-/// snippets, and access to SFTP and port forwarding.
-struct SessionView: View {
+/// One session's terminal + key bar, embedded in the Terminal tab. Several of
+/// these are kept alive at once (one per open session) and only the active one
+/// is shown, so switching sessions preserves scrollback.
+struct SessionPane: View {
     let session: SSHSession
-    @Environment(AppStore.self) private var store
-    @Environment(SessionManager.self) private var sessions
-    @Environment(\.dismiss) private var dismiss
+    let active: Bool
+    var fontSize: CGFloat = 13
 
     @State private var terminal = TerminalController()
-    @State private var showSFTP = false
-    @State private var showSnippets = false
     @State private var showLog = false
-    @State private var fontSize: CGFloat = 13
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,111 +17,85 @@ struct SessionView: View {
                 TerminalScreen(session: session, controller: terminal, fontSize: fontSize)
                     .ignoresSafeArea(.container, edges: .bottom)
                 if case .failed(let msg) = session.status {
-                    failureOverlay(msg)
+                    FailureOverlay(message: msg,
+                                   onRetry: { Task { await session.connect() } },
+                                   onLog: { showLog = true })
                 }
             }
-            keyBar
+            KeyBar(session: session, terminal: terminal)
         }
-        .navigationTitle(session.host.displayName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showLog = true } label: { StatusPill(status: session.status) }
-            }
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Menu {
-                    Button { fontSize = min(22, fontSize + 1) } label: { Label("Larger text", systemImage: "textformat.size.larger") }
-                    Button { fontSize = max(9, fontSize - 1) } label: { Label("Smaller text", systemImage: "textformat.size.smaller") }
-                    Divider()
-                    Button { showSnippets = true } label: { Label("Snippets", systemImage: "chevron.left.forwardslash.chevron.right") }
-                    Button { showSFTP = true } label: { Label("Files (SFTP)", systemImage: "folder") }
-                    Button { showLog = true } label: { Label("Connection log", systemImage: "doc.text.magnifyingglass") }
-                    Divider()
-                    Button(role: .destructive) { sessions.close(session); dismiss() } label: { Label("Disconnect", systemImage: "xmark.circle") }
-                } label: { Image(systemName: "ellipsis.circle") }
-            }
-        }
-        .sheet(isPresented: $showSFTP) {
-            NavigationStack { SFTPBrowserView(session: session) }
-        }
-        .sheet(isPresented: $showSnippets) {
-            SnippetPickerView { snippet in
-                session.runSnippet(snippet)
-                showSnippets = false
-            }
-        }
-        .sheet(isPresented: $showLog) {
-            ConnectionLogView(session: session)
-        }
+        .sheet(isPresented: $showLog) { ConnectionLogView(session: session) }
     }
+}
 
-    private func failureOverlay(_ msg: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 40)).foregroundStyle(.orange)
-            Text("Couldn't connect").font(.headline)
-            Text(msg)
-                .font(.footnote).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .textSelection(.enabled)
-            HStack {
-                Button { showLog = true } label: { Label("View log", systemImage: "doc.text.magnifyingglass") }
-                    .buttonStyle(.bordered)
-                Button { Task { await session.connect() } } label: { Label("Retry", systemImage: "arrow.clockwise") }
-                    .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(28)
-        .frame(maxWidth: 360)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .padding()
-    }
+/// The accessory key row with a pinned keyboard-dismiss button.
+struct KeyBar: View {
+    let session: SSHSession
+    let terminal: TerminalController
+    @State private var ctrlActive = false
 
-    // A row of keys a software keyboard lacks but a terminal needs, with a
-    // pinned button to dismiss the keyboard.
-    private var keyBar: some View {
+    var body: some View {
         HStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     key("esc") { send("\u{1b}") }
                     key("tab") { send("\t") }
                     key("ctrl", toggle: $ctrlActive)
-                    key("/") { send("/") }
-                    key("-") { send("-") }
-                    key("|") { send("|") }
-                    key("↑") { send("\u{1b}[A") }
-                    key("↓") { send("\u{1b}[B") }
-                    key("←") { send("\u{1b}[D") }
-                    key("→") { send("\u{1b}[C") }
+                    group {
+                        key("~") { send("~") }
+                        key("/") { send("/") }
+                        key("-") { send("-") }
+                        key("|") { send("|") }
+                    }
+                    group {
+                        key(systemImage: "arrow.up") { send("\u{1b}[A") }
+                        key(systemImage: "arrow.down") { send("\u{1b}[B") }
+                        key(systemImage: "arrow.left") { send("\u{1b}[D") }
+                        key(systemImage: "arrow.right") { send("\u{1b}[C") }
+                    }
                     key("^C") { send("\u{03}") }
                     key("^D") { send("\u{04}") }
                     key("^Z") { send("\u{1a}") }
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            Divider().frame(height: 26)
+            Divider().frame(height: 24)
             Button { terminal.dismissKeyboard() } label: {
                 Image(systemName: "keyboard.chevron.compact.down")
-                    .font(.system(size: 17))
-                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(width: 46, height: 42)
             }
             .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
         }
-        .background(.ultraThinMaterial)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 
-    @State private var ctrlActive = false
+    private func group<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        HStack(spacing: 7) { content() }
+    }
 
     private func key(_ label: String, toggle: Binding<Bool>? = nil, _ action: (() -> Void)? = nil) -> some View {
         Button {
             if let toggle { toggle.wrappedValue.toggle() } else { action?() }
         } label: {
             Text(label)
-                .font(.system(.footnote, design: .monospaced))
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background((toggle?.wrappedValue ?? false) ? Theme.accent.opacity(0.4) : Color.primary.opacity(0.08),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .frame(minWidth: 34, minHeight: 32)
+                .background((toggle?.wrappedValue ?? false) ? AnyShapeStyle(Theme.accent.opacity(0.45)) : AnyShapeStyle(Color(.tertiarySystemFill)),
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func key(systemImage: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(minWidth: 34, minHeight: 32)
+                .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -132,10 +103,37 @@ struct SessionView: View {
     private func send(_ s: String) {
         var text = s
         if ctrlActive, let scalar = s.unicodeScalars.first, scalar.value >= 0x60 {
-            // Translate a following letter into its control code.
             text = String(UnicodeScalar(scalar.value & 0x1f) ?? scalar)
             ctrlActive = false
         }
         session.sendToShell(Data(text.utf8))
+    }
+}
+
+/// Shown over the terminal when a connection fails.
+struct FailureOverlay: View {
+    let message: String
+    let onRetry: () -> Void
+    let onLog: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 38)).foregroundStyle(.orange)
+            Text("Couldn't connect").font(.headline)
+            Text(message)
+                .font(.footnote).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).textSelection(.enabled)
+            HStack(spacing: 10) {
+                Button(action: onLog) { Label("View log", systemImage: "doc.text.magnifyingglass") }
+                    .buttonStyle(.bordered)
+                Button(action: onRetry) { Label("Retry", systemImage: "arrow.clockwise") }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(28)
+        .frame(maxWidth: 360)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding()
     }
 }
