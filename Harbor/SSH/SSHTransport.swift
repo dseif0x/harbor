@@ -28,7 +28,7 @@ protocol SSHTransport: AnyObject {
     /// the caller can apply trust-on-first-use before the session is used.
     func connect(
         _ credentials: SSHCredentials,
-        verify: @Sendable (_ keyType: String, _ fingerprintSHA256: String) async -> Bool
+        verify: @escaping @Sendable (_ keyType: String, _ fingerprintSHA256: String) async -> Bool
     ) async throws
 
     /// Opens an interactive shell with a PTY of the given size.

@@ -12,8 +12,11 @@ import Observation
 ///   • A Live Activity mirrors the status and buys extra background runtime.
 @MainActor
 @Observable
-final class SSHSession: Identifiable {
+final class SSHSession: Identifiable, Hashable {
     let id = UUID()
+
+    nonisolated static func == (lhs: SSHSession, rhs: SSHSession) -> Bool { lhs.id == rhs.id }
+    nonisolated func hash(into hasher: inout Hasher) { hasher.combine(id) }
     let host: Host
     private let store: AppStore
 

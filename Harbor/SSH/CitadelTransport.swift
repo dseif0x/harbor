@@ -9,42 +9,37 @@ import Crypto
 ///
 /// This is the one place that touches Citadel's API. The rest of Harbor speaks
 /// only `SSHTransport`/`SFTPClient`, so replacing this with a libssh2 or Mosh
-/// backend is a local change. The stable surface here is connect + SFTP + exec;
-/// the interactive PTY shell tracks Citadel's current shell API and is the most
-/// likely spot to need a tweak against a newer Citadel release.
+/// backend is a local change.
 actor CitadelTransport: SSHTransport {
     private var client: SSHClient?
     private var shellChannels: [CitadelShellChannel] = []
 
-    nonisolated var isConnected: Bool { _connected.withLock { $0 } }
+    nonisolated var isConnected: Bool { _connected.withLockedValue { $0 } }
     private let _connected = NIOLockedValueBox(false)
 
     func connect(
         _ creds: SSHCredentials,
-        verify: @Sendable (_ keyType: String, _ fingerprintSHA256: String) async -> Bool
+        verify: @escaping @Sendable (_ keyType: String, _ fingerprintSHA256: String) async -> Bool
     ) async throws {
         let auth = try Self.authentication(for: creds)
 
-        // Trust-on-first-use: we accept the handshake, then surface the server's
-        // host key fingerprint to `verify` so the caller can pin or reject it.
-        let validator = TOFUHostKeyValidator(verify: verify)
+        // Trust-on-first-use: Citadel calls our delegate with the server's host
+        // key, which we fingerprint and hand to `verify` to pin or reject.
+        let validator = SSHHostKeyValidator.custom(HostKeyDelegate(verify: verify))
 
         let client = try await SSHClient.connect(
             host: creds.hostname,
             port: creds.port,
             authenticationMethod: auth,
-            hostKeyValidator: .custom(validator),
+            hostKeyValidator: validator,
             reconnect: .never
         )
         self.client = client
-        _connected.withLock { $0 = true }
+        _connected.withLockedValue { $0 = true }
     }
 
     private static func authentication(for creds: SSHCredentials) throws -> SSHAuthenticationMethod {
         if let key = creds.privateKey, !key.isEmpty {
-            // OpenSSH private key text → a NIOSSH signing key. Citadel parses the
-            // common Ed25519/RSA/ECDSA formats; passphrase-protected keys are
-            // decrypted with `creds.passphrase`.
             if let parsed = try? SSHKeyParser.privateKey(from: key, passphrase: creds.passphrase) {
                 return parsed.authentication(username: creds.username)
             }
@@ -58,7 +53,7 @@ actor CitadelTransport: SSHTransport {
 
     func openShell(cols: Int, rows: Int) async throws -> SSHShellChannel {
         guard let client else { throw SSHError.notConnected }
-        let channel = try await CitadelShellChannel(client: client, cols: cols, rows: rows)
+        let channel = CitadelShellChannel(client: client, cols: cols, rows: rows)
         shellChannels.append(channel)
         return channel
     }
@@ -84,23 +79,11 @@ actor CitadelTransport: SSHTransport {
         shellChannels.removeAll()
         try? await client?.close()
         client = nil
-        _connected.withLock { $0 = false }
+        _connected.withLockedValue { $0 = false }
     }
 }
 
 /// Bridges Citadel's host-key callback to our async `verify` closure.
-private struct TOFUHostKeyValidator: Sendable {
-    let verify: @Sendable (String, String) async -> Bool
-}
-
-extension SSHHostKeyValidator {
-    /// A validator that defers the trust decision to a closure, passing the
-    /// server key's type and SHA-256 fingerprint (the format OpenSSH prints).
-    static func custom(_ v: TOFUHostKeyValidator) -> SSHHostKeyValidator {
-        .custom(validator: HostKeyDelegate(verify: v.verify))
-    }
-}
-
 private final class HostKeyDelegate: NIOSSHClientServerAuthenticationDelegate, @unchecked Sendable {
     let verify: @Sendable (String, String) async -> Bool
     init(verify: @escaping @Sendable (String, String) async -> Bool) { self.verify = verify }

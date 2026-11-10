@@ -26,7 +26,7 @@ enum SSHKeyParser {
             return ParsedKey { .ed25519(username: $0, privateKey: key) }
         }
         // RSA (Citadel's Insecure.RSA for broad server compatibility)
-        if let key = try? Insecure.RSA.PrivateKey(sshRsa: pem) {
+        if let key = try? Insecure.RSA.PrivateKey(sshRsa: pem, decryptionKey: passphrase.map { Data($0.utf8) }) {
             return ParsedKey { .rsa(username: $0, privateKey: key) }
         }
         throw SSHError.channelFailed("Unsupported or malformed private key.")
@@ -37,7 +37,7 @@ enum SSHKeyParser {
         var buffer = ByteBufferAllocator().buffer(capacity: 256)
         // NIOSSH serializes the public key in SSH wire format; we hash those
         // bytes exactly as OpenSSH does for its SHA256 fingerprint.
-        let written = (try? key.write(to: &buffer)) ?? 0
+        let written = key.write(to: &buffer)
         let bytes = buffer.getBytes(at: 0, length: written) ?? []
         let digest = SHA256.hash(data: Data(bytes))
         let b64 = Data(digest).base64EncodedString().replacingOccurrences(of: "=", with: "")

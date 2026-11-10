@@ -6,59 +6,67 @@ import NIOSSH
 /// An interactive PTY shell over Citadel. Server output is delivered on
 /// `onData`; keystrokes go out via `send`.
 ///
-/// Citadel exposes an interactive TTY via `SSHClient`. The exact entry point has
-/// moved between releases (`withPTY` / `openTTY` / `executeCommandPair`), so this
-/// wrapper isolates it: if the pinned Citadel version names it differently, this
-/// is the only file to touch.
+/// Citadel exposes interactive terminals through the closure-based `withPTY`.
+/// We run it in a long-lived task: the closure stays suspended on the inbound
+/// stream (keeping the channel open) and we capture the stdin writer so `send`
+/// and `resize` can reach it from outside.
 actor CitadelShellChannel: SSHShellChannel {
     nonisolated(unsafe) var onData: ((Data) -> Void)?
     nonisolated(unsafe) var onClose: (() -> Void)?
 
-    private let tty: TTYStdinWriter
-    private var readerTask: Task<Void, Never>?
+    private var writer: TTYStdinWriter?
+    private var task: Task<Void, Never>?
 
-    init(client: SSHClient, cols: Int, rows: Int) async throws {
-        // Request a PTY and an interactive login shell.
-        let settings = SSHChannelType.PTY.PTYSettings(
+    init(client: SSHClient, cols: Int, rows: Int) {
+        let request = SSHChannelRequestEvent.PseudoTerminalRequest(
+            wantReply: true,
             term: "xterm-256color",
-            columns: cols,
-            rows: rows
+            terminalCharacterWidth: cols,
+            terminalRowHeight: rows,
+            terminalPixelWidth: 0,
+            terminalPixelHeight: 0,
+            terminalModes: SSHTerminalModes([:])
         )
-        let (stdinWriter, output) = try await client.openPTY(settings: settings)
-        self.tty = stdinWriter
-
-        // Pump server → UI.
-        readerTask = Task { [weak self] in
+        task = Task { [weak self] in
             do {
-                for try await chunk in output {
-                    guard let self else { return }
-                    let data: Data
-                    switch chunk {
-                    case .stdout(let buf), .stderr(let buf):
-                        data = Data(buffer: buf)
+                try await client.withPTY(request) { inbound, outbound in
+                    await self?.setWriter(outbound)
+                    for try await chunk in inbound {
+                        let buffer: ByteBuffer
+                        switch chunk {
+                        case .stdout(let b): buffer = b
+                        case .stderr(let b): buffer = b
+                        }
+                        let data = Data(buffer.readableBytesView)
+                        if let cb = self?.onData {
+                            await MainActor.run { cb(data) }
+                        }
                     }
-                    await MainActor.run { self.onData?(data) }
                 }
             } catch {
-                // Stream ended or errored — treat as a close.
+                // Stream ended or errored — fall through to the close callback.
             }
-            if let self { await MainActor.run { self.onClose?() } }
+            if let cb = self?.onClose {
+                await MainActor.run { cb() }
+            }
         }
     }
 
+    private func setWriter(_ w: TTYStdinWriter) { writer = w }
+
     func send(_ data: Data) async {
+        guard let writer else { return }
         var buf = ByteBufferAllocator().buffer(capacity: data.count)
         buf.writeBytes(data)
-        try? await tty.write(buf)
+        try? await writer.write(buf)
     }
 
     func resize(cols: Int, rows: Int) async {
-        try? await tty.changeSize(cols: cols, rows: rows)
+        try? await writer?.changeSize(cols: cols, rows: rows, pixelWidth: 0, pixelHeight: 0)
     }
 
     func close() async {
-        readerTask?.cancel()
-        try? await tty.close()
-        await MainActor.run { onClose?() }
+        task?.cancel()
+        task = nil
     }
 }

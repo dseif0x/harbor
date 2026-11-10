@@ -35,19 +35,20 @@ struct TerminalScreen: UIViewRepresentable {
         weak var terminalView: TerminalView?
         init(session: SSHSession) { self.session = session }
 
+        // SwiftTerm invokes these on the main thread.
         func send(source: TerminalView, data: ArraySlice<UInt8>) {
-            session.sendToShell(Data(data))
+            MainActor.assumeIsolated { session.sendToShell(Data(data)) }
         }
 
         func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
-            session.resizeTerminal(cols: newCols, rows: newRows)
+            MainActor.assumeIsolated { session.resizeTerminal(cols: newCols, rows: newRows) }
         }
 
         func setTerminalTitle(source: TerminalView, title: String) {}
         func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
         func scrolled(source: TerminalView, position: Double) {}
         func requestOpenLink(source: TerminalView, link: String, params: [String : String]) {
-            if let url = URL(string: link) { UIApplication.shared.open(url) }
+            if let url = URL(string: link) { MainActor.assumeIsolated { UIApplication.shared.open(url) } }
         }
         func bell(source: TerminalView) {}
         func clipboardCopy(source: TerminalView, content: Data) {
