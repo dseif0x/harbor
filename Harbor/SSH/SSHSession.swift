@@ -125,7 +125,13 @@ final class SSHSession: Identifiable, Hashable {
         } catch {
             note("Failed: \(describe(error))", .error)
             note("Detail: \(String(reflecting: error))", .error)
-            status = .failed(describe(error))
+            var message = describe(error)
+            if store.key(host.keyID)?.type == .rsa, "\(error)".contains("allAuthenticationOptionsFailed") {
+                let hint = "This RSA key is signed with SHA-1 (ssh-rsa), which OpenSSH 8.8+ rejects by default. Use an Ed25519 key instead."
+                note("Hint: " + hint, .error)
+                message = hint
+            }
+            status = .failed(message)
             LiveActivityController.shared.end()
         }
     }

@@ -18,6 +18,17 @@ enum SSHKeyParser {
         func authentication(username: String) -> SSHAuthenticationMethod { make(username) }
     }
 
+    /// Derives the OpenSSH public-key line (`ssh-ed25519 AAAA… comment`) from an
+    /// imported Ed25519 private key, so the user can copy it to a server.
+    static func publicKeyLine(fromPrivate text: String, passphrase: String?, comment: String = "harbor") -> String? {
+        let pem = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let dk = passphrase.flatMap { $0.isEmpty ? nil : Data($0.utf8) }
+        if let key = try? Curve25519.Signing.PrivateKey(sshEd25519: pem, decryptionKey: dk) {
+            return key.makeSSHRepresentation(comment: comment)
+        }
+        return nil
+    }
+
     static func privateKey(from text: String, passphrase: String?) throws -> ParsedKey {
         let pem = text.trimmingCharacters(in: .whitespacesAndNewlines)
 

@@ -63,10 +63,18 @@ struct KeyEditView: View {
                 Section("Name") {
                     TextField("e.g. Personal laptop", text: $key.name)
                 }
-                Section("Type") {
+                Section {
                     Picker("Type", selection: $key.type) {
                         ForEach(SSHKey.KeyType.allCases) { Text($0.rawValue).tag($0) }
                     }.pickerStyle(.segmented)
+                } header: {
+                    Text("Type")
+                } footer: {
+                    if key.type == .rsa {
+                        Label("RSA keys are signed with SHA-1 and are rejected by OpenSSH 8.8+ (most modern servers). Prefer Ed25519.",
+                              systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
                 }
                 Section {
                     TextEditor(text: $privateKeyText)
@@ -108,6 +116,10 @@ struct KeyEditView: View {
     private func save() {
         if !privateKeyText.isEmpty {
             try? Keychain.set(privateKeyText, for: key.keychainTag)
+            if key.type == .ed25519,
+               let pub = SSHKeyParser.publicKeyLine(fromPrivate: privateKeyText, passphrase: passphrase) {
+                key.publicKey = pub
+            }
         }
         key.hasPassphrase = !passphrase.isEmpty
         if passphrase.isEmpty { Keychain.remove(key.keychainTag + ".passphrase") }
