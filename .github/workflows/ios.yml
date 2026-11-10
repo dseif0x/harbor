@@ -20,8 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select latest Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+      - name: Show build environment
+        run: |
+          xcodebuild -version
+          echo "Installed iOS SDKs:"; xcodebuild -showsdks | grep -i ios || true
 
       - name: Install XcodeGen
         run: brew install xcodegen
