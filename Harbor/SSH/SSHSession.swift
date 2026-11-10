@@ -24,6 +24,47 @@ final class SSHSession: Identifiable, Hashable {
     private(set) var shell: SSHShellChannel?
     private(set) var transfers: [Transfer] = []
 
+    /// A rolling connection log, surfaced in the UI so failures are legible
+    /// (iOS/Citadel error messages are otherwise opaque).
+    private(set) var log: [LogEntry] = []
+
+    struct LogEntry: Identifiable {
+        let id = UUID()
+        let time = Date()
+        let text: String
+        let kind: Kind
+        enum Kind { case info, success, error }
+    }
+
+    private func note(_ text: String, _ kind: LogEntry.Kind = .info) {
+        log.append(LogEntry(text: text, kind: kind))
+        if log.count > 500 { log.removeFirst(log.count - 500) }
+    }
+
+    /// Human-readable error text. For Citadel/NIO errors `localizedDescription`
+    /// is unhelpful, so we use the case name via string interpolation.
+    private func describe(_ error: Error) -> String {
+        if let e = error as? SSHError { return e.errorDescription ?? "\(error)" }
+        // Citadel's common cases print as bare case names; translate the ones a
+        // user can act on. The raw case is still kept in the log for diagnosis.
+        switch "\(error)" {
+        case let s where s.contains("allAuthenticationOptionsFailed"):
+            return "Authentication failed — wrong password/key, or the server refused this method."
+        case let s where s.contains("unsupportedPrivateKeyAuthentication"):
+            return "The server rejected key authentication."
+        case let s where s.contains("channelCreationFailed"), let s where s.contains("channelFailure"):
+            return "The server accepted the login but refused to open a shell channel."
+        case let s where s.contains("NIOSSHError"), let s where s.contains("keyExchange"), let s where s.contains("Negotiation"):
+            return "Couldn't agree on encryption with the server (key-exchange/algorithm mismatch)."
+        case let s where s.contains("connection reset"), let s where s.contains("ECONNREFUSED"), let s where s.contains("refused"):
+            return "Connection refused — check the host, port and that SSH is reachable."
+        case let s where s.contains("timed out") || s.contains("Timeout") || s.contains("timeout"):
+            return "Connection timed out — host unreachable from this network."
+        default:
+            return "\(error)"
+        }
+    }
+
     /// Terminal bytes received from the server; the terminal view consumes this.
     var onShellData: ((Data) -> Void)?
 
@@ -47,35 +88,44 @@ final class SSHSession: Identifiable, Hashable {
     func connect() async {
         intentionalDisconnect = false
         status = .connecting
+        note("Connecting to \(host.hostname):\(host.port) as \(host.username)…")
         let transport = CitadelTransport()
         self.transport = transport
 
         guard let creds = makeCredentials() else {
+            note("No credentials found for this host.", .error)
             status = .failed("Missing credentials for this host.")
             return
         }
+        note("Auth: \(host.auth.title)\(creds.privateKey != nil ? " (key present)" : "")\(creds.password != nil ? " (password present)" : "")")
 
         do {
             try await transport.connect(creds, verify: { [weak self] type, fp in
                 await self?.verifyHostKey(type: type, fingerprint: fp) ?? false
             })
             status = .authenticating
+            note("Handshake OK, opening shell…", .success)
             let shell = try await transport.openShell(cols: termCols, rows: termRows)
             shell.onData = { [weak self] data in self?.onShellData?(data) }
             shell.onClose = { [weak self] in self?.handleDrop(reason: "Shell closed") }
             self.shell = shell
             status = .connected
+            note("Connected.", .success)
             store.markConnected(host)
             LiveActivityController.shared.start(host: host.displayName, status: status)
             startKeepalive()
             await runOnConnectSnippet()
         } catch let e as SSHError {
+            note("Failed: \(e.errorDescription ?? "\(e)")", .error)
             status = .failed(e.errorDescription ?? "Connection failed.")
             LiveActivityController.shared.end()
         } catch is CancellationError {
+            note("Cancelled.")
             status = .disconnected(reason: nil)
         } catch {
-            status = .failed(error.localizedDescription)
+            note("Failed: \(describe(error))", .error)
+            note("Detail: \(String(reflecting: error))", .error)
+            status = .failed(describe(error))
             LiveActivityController.shared.end()
         }
     }
@@ -101,8 +151,11 @@ final class SSHSession: Identifiable, Hashable {
 
     private func verifyHostKey(type: String, fingerprint: String) async -> Bool {
         if let known = store.knownHost(for: host.hostname, port: host.port) {
-            return known.fingerprintSHA256 == fingerprint   // reject silently on change; UI can surface later
+            let ok = known.fingerprintSHA256 == fingerprint
+            note(ok ? "Host key OK (\(fingerprint))" : "Host key CHANGED — rejected (\(fingerprint))", ok ? .info : .error)
+            return ok
         }
+        note("New host key trusted (\(fingerprint))")
         store.trust(KnownHost(hostname: host.hostname, port: host.port,
                               keyType: type, fingerprintSHA256: fingerprint))
         return true

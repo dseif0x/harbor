@@ -9,18 +9,26 @@ struct SessionView: View {
 
     @State private var showSFTP = false
     @State private var showSnippets = false
+    @State private var showLog = false
     @State private var fontSize: CGFloat = 13
 
     var body: some View {
         VStack(spacing: 0) {
-            TerminalScreen(session: session, fontSize: fontSize)
-                .ignoresSafeArea(.container, edges: .bottom)
+            ZStack {
+                TerminalScreen(session: session, fontSize: fontSize)
+                    .ignoresSafeArea(.container, edges: .bottom)
+                if case .failed(let msg) = session.status {
+                    failureOverlay(msg)
+                }
+            }
             keyBar
         }
         .navigationTitle(session.host.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { StatusPill(status: session.status) }
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showLog = true } label: { StatusPill(status: session.status) }
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Menu {
                     Button { fontSize = min(22, fontSize + 1) } label: { Label("Larger text", systemImage: "textformat.size.larger") }
@@ -28,6 +36,7 @@ struct SessionView: View {
                     Divider()
                     Button { showSnippets = true } label: { Label("Snippets", systemImage: "chevron.left.forwardslash.chevron.right") }
                     Button { showSFTP = true } label: { Label("Files (SFTP)", systemImage: "folder") }
+                    Button { showLog = true } label: { Label("Connection log", systemImage: "doc.text.magnifyingglass") }
                     Divider()
                     Button(role: .destructive) { sessions.close(session) } label: { Label("Disconnect", systemImage: "xmark.circle") }
                 } label: { Image(systemName: "ellipsis.circle") }
@@ -42,6 +51,31 @@ struct SessionView: View {
                 showSnippets = false
             }
         }
+        .sheet(isPresented: $showLog) {
+            ConnectionLogView(session: session)
+        }
+    }
+
+    private func failureOverlay(_ msg: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 40)).foregroundStyle(.orange)
+            Text("Couldn't connect").font(.headline)
+            Text(msg)
+                .font(.footnote).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .textSelection(.enabled)
+            HStack {
+                Button { showLog = true } label: { Label("View log", systemImage: "doc.text.magnifyingglass") }
+                    .buttonStyle(.bordered)
+                Button { Task { await session.connect() } } label: { Label("Retry", systemImage: "arrow.clockwise") }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(28)
+        .frame(maxWidth: 360)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding()
     }
 
     // A row of keys a software keyboard lacks but a terminal needs.
