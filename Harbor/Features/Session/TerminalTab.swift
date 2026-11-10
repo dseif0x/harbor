@@ -37,8 +37,11 @@ struct TerminalTab: View {
                     }
                 }
             }
+            .background(Theme.bg.ignoresSafeArea())
             .safeAreaInset(edge: .top, spacing: 0) {
-                if !sessions.sessions.isEmpty { sessionBar }
+                // Only show the switcher when there's more than one session, so a
+                // single session doesn't stack two bars.
+                if sessions.sessions.count > 1 { sessionBar }
             }
             .navigationTitle(active?.host.displayName ?? "Terminal")
             .navigationBarTitleDisplayMode(.inline)
@@ -83,11 +86,20 @@ struct TerminalTab: View {
         .overlay(alignment: .bottom) { Divider() }
     }
 
+    /// Disambiguates duplicate sessions to the same host (e.g. "brute 2").
+    private func chipLabel(_ s: SSHSession) -> String {
+        let same = sessions.sessions.filter { $0.host.id == s.host.id }
+        guard same.count > 1, let idx = same.firstIndex(where: { $0.id == s.id }) else {
+            return s.host.displayName
+        }
+        return "\(s.host.displayName) \(idx + 1)"
+    }
+
     private func sessionChip(_ s: SSHSession) -> some View {
         let isActive = s.id == active?.id
         return HStack(spacing: 8) {
             Circle().fill(s.status.tint).frame(width: 7, height: 7)
-            Text(s.host.displayName).font(.subheadline.weight(.medium)).lineLimit(1)
+            Text(chipLabel(s)).font(.subheadline.weight(.medium)).lineLimit(1)
             Button { sessions.close(s) } label: {
                 Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
             }
@@ -113,6 +125,9 @@ struct TerminalTab: View {
                 Menu {
                     Button { fontSize = min(22, fontSize + 1) } label: { Label("Larger text", systemImage: "textformat.size.larger") }
                     Button { fontSize = max(9, fontSize - 1) } label: { Label("Smaller text", systemImage: "textformat.size.smaller") }
+                    Divider()
+                    Button { showPicker = true } label: { Label("New session", systemImage: "plus") }
+                    if let active { Button { sessions.open(active.host) } label: { Label("Duplicate session", systemImage: "plus.square.on.square") } }
                     Divider()
                     Button { showSnippets = true } label: { Label("Snippets", systemImage: "chevron.left.forwardslash.chevron.right") }
                     Button { showSFTP = true } label: { Label("Files (SFTP)", systemImage: "folder") }

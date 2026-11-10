@@ -19,6 +19,7 @@ struct HostsListView: View {
                     content
                 }
             }
+            .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Harbor")
             .searchable(text: $search, prompt: "Search hosts")
             .toolbar {

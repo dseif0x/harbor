@@ -46,6 +46,8 @@ struct SettingsView: View {
                     Text("Harbor \(appVersion) · open source, no accounts, no telemetry.")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Settings")
         }
     }

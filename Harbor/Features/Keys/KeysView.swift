@@ -22,6 +22,8 @@ struct KeysView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Keys")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

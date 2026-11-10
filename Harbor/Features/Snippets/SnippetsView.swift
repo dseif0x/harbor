@@ -22,6 +22,8 @@ struct SnippetsView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Snippets")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

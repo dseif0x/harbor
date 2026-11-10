@@ -12,16 +12,20 @@ final class SessionManager {
     private let store: AppStore
     init(store: AppStore) { self.store = store }
 
+    /// Always opens a new session, so you can hold several connections to the
+    /// same host at once. Use `focusOrOpen` to reuse an existing one.
+    @discardableResult
     func open(_ host: Host) -> SSHSession {
-        if let existing = sessions.first(where: { $0.host.id == host.id }) {
-            active = existing
-            return existing
-        }
         let session = SSHSession(host: host, store: store)
         sessions.append(session)
         active = session
         Task { await session.connect() }
         return session
+    }
+
+    /// Number of live sessions for a host, for the Hosts badge.
+    func sessionCount(for host: Host) -> Int {
+        sessions.filter { $0.host.id == host.id && $0.status.isActive }.count
     }
 
     func close(_ session: SSHSession) {

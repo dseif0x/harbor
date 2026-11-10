@@ -8,6 +8,12 @@ enum Theme {
     static let smallCorner: CGFloat = 10
     static let spacing: CGFloat = 14
 
+    // App background: a dark slate gray (not pure black), which reads better
+    // under Liquid Glass and matches the agents-operator look.
+    static let bg = Color(hex: 0x15171C)
+    static let bgUI = UIColor(red: 0x15/255, green: 0x17/255, blue: 0x1C/255, alpha: 1)
+    static let surface = Color(hex: 0x1C1F26)
+
     // Accent gradient used on primary actions and highlights.
     static let accent = Color("AccentColor")
     static var accentGradient: LinearGradient {
