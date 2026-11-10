@@ -33,4 +33,17 @@ final class SessionManager {
     var hasActiveConnections: Bool {
         sessions.contains { $0.status.isActive }
     }
+
+    var activeCount: Int {
+        sessions.filter { $0.status.isActive }.count
+    }
+
+    /// Removes sessions that have ended (disconnected or failed), so the
+    /// Terminal list only shows live connections — like Termius.
+    func pruneDead() {
+        let dead = sessions.filter { !$0.status.isActive }
+        for s in dead { Task { await s.disconnect() } }
+        sessions.removeAll { !$0.status.isActive }
+        if let a = active, !a.status.isActive { active = sessions.last }
+    }
 }

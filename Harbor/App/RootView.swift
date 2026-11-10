@@ -10,7 +10,7 @@ struct RootView: View {
 
             SessionsTab()
                 .tabItem { Label("Terminal", systemImage: "terminal") }
-                .badge(sessions.sessions.count)
+                .badge(sessions.activeCount)
 
             KeysView()
                 .tabItem { Label("Keys", systemImage: "key.fill") }
@@ -53,6 +53,7 @@ struct SessionsTab: View {
                 }
             }
             .navigationTitle("Terminal")
+            .onAppear { sessions.pruneDead() }
         }
     }
 

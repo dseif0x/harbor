@@ -52,6 +52,10 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         NSSupportsLiveActivities: true
+        UIAppFonts:
+          - FiraCode-Regular.ttf
+          - FiraCode-Bold.ttf
+          - FiraCode-Light.ttf
         NSLocalNetworkUsageDescription: Harbor connects to SSH and SFTP servers on your local network.
         UIBackgroundModes:
           - fetch

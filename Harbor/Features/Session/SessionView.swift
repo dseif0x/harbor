@@ -6,7 +6,9 @@ struct SessionView: View {
     let session: SSHSession
     @Environment(AppStore.self) private var store
     @Environment(SessionManager.self) private var sessions
+    @Environment(\.dismiss) private var dismiss
 
+    @State private var terminal = TerminalController()
     @State private var showSFTP = false
     @State private var showSnippets = false
     @State private var showLog = false
@@ -15,7 +17,7 @@ struct SessionView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                TerminalScreen(session: session, fontSize: fontSize)
+                TerminalScreen(session: session, controller: terminal, fontSize: fontSize)
                     .ignoresSafeArea(.container, edges: .bottom)
                 if case .failed(let msg) = session.status {
                     failureOverlay(msg)
@@ -38,7 +40,7 @@ struct SessionView: View {
                     Button { showSFTP = true } label: { Label("Files (SFTP)", systemImage: "folder") }
                     Button { showLog = true } label: { Label("Connection log", systemImage: "doc.text.magnifyingglass") }
                     Divider()
-                    Button(role: .destructive) { sessions.close(session) } label: { Label("Disconnect", systemImage: "xmark.circle") }
+                    Button(role: .destructive) { sessions.close(session); dismiss() } label: { Label("Disconnect", systemImage: "xmark.circle") }
                 } label: { Image(systemName: "ellipsis.circle") }
             }
         }
@@ -78,26 +80,36 @@ struct SessionView: View {
         .padding()
     }
 
-    // A row of keys a software keyboard lacks but a terminal needs.
+    // A row of keys a software keyboard lacks but a terminal needs, with a
+    // pinned button to dismiss the keyboard.
     private var keyBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                key("esc") { send("\u{1b}") }
-                key("tab") { send("\t") }
-                key("ctrl", toggle: $ctrlActive)
-                key("/") { send("/") }
-                key("-") { send("-") }
-                key("|") { send("|") }
-                key("↑") { send("\u{1b}[A") }
-                key("↓") { send("\u{1b}[B") }
-                key("←") { send("\u{1b}[D") }
-                key("→") { send("\u{1b}[C") }
-                key("^C") { send("\u{03}") }
-                key("^D") { send("\u{04}") }
-                key("^Z") { send("\u{1a}") }
+        HStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    key("esc") { send("\u{1b}") }
+                    key("tab") { send("\t") }
+                    key("ctrl", toggle: $ctrlActive)
+                    key("/") { send("/") }
+                    key("-") { send("-") }
+                    key("|") { send("|") }
+                    key("↑") { send("\u{1b}[A") }
+                    key("↓") { send("\u{1b}[B") }
+                    key("←") { send("\u{1b}[D") }
+                    key("→") { send("\u{1b}[C") }
+                    key("^C") { send("\u{03}") }
+                    key("^D") { send("\u{04}") }
+                    key("^Z") { send("\u{1a}") }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            Divider().frame(height: 26)
+            Button { terminal.dismissKeyboard() } label: {
+                Image(systemName: "keyboard.chevron.compact.down")
+                    .font(.system(size: 17))
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
         }
         .background(.ultraThinMaterial)
     }

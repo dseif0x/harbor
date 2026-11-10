@@ -1,10 +1,28 @@
 import SwiftUI
 import SwiftTerm
 
+/// Lets SwiftUI reach into the UIKit terminal (e.g. to dismiss the keyboard).
+final class TerminalController {
+    weak var view: TerminalView?
+    func dismissKeyboard() { _ = view?.resignFirstResponder() }
+    func focus() { _ = view?.becomeFirstResponder() }
+}
+
+/// The terminal font. Fira Code gives a clean, modern monospace; we fall back
+/// to the system monospace if it fails to load. (SwiftTerm renders per cell, so
+/// Fira Code's programming ligatures are not combined — glyphs only.)
+enum TerminalFont {
+    static func mono(_ size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
+        let name = weight == .bold ? "FiraCode-Bold" : (weight == .light ? "FiraCode-Light" : "FiraCode-Regular")
+        return UIFont(name: name, size: size) ?? .monospacedSystemFont(ofSize: size, weight: weight)
+    }
+}
+
 /// Bridges SwiftTerm's UIKit `TerminalView` into SwiftUI and wires it to an
 /// `SSHSession`: server bytes are fed in, keystrokes and resizes go back out.
 struct TerminalScreen: UIViewRepresentable {
     let session: SSHSession
+    let controller: TerminalController
     var fontSize: CGFloat = 13
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session) }
@@ -12,10 +30,11 @@ struct TerminalScreen: UIViewRepresentable {
     func makeUIView(context: Context) -> TerminalView {
         let view = TerminalView()
         view.terminalDelegate = context.coordinator
-        view.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        applyFonts(view)
         view.backgroundColor = .black
         view.nativeBackgroundColor = .black
         view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
+        controller.view = view
 
         // Server → terminal.
         session.onShellData = { [weak view] data in
@@ -27,7 +46,13 @@ struct TerminalScreen: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: TerminalView, context: Context) {
-        uiView.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        applyFonts(uiView)
+    }
+
+    private func applyFonts(_ view: TerminalView) {
+        let regular = TerminalFont.mono(fontSize)
+        let bold = TerminalFont.mono(fontSize, weight: .bold)
+        view.setFonts(normal: regular, bold: bold, italic: regular, boldItalic: bold)
     }
 
     final class Coordinator: NSObject, TerminalViewDelegate {
