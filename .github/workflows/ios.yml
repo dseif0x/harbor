@@ -35,7 +35,8 @@ jobs:
         run: |
           xcodebuild -resolvePackageDependencies \
             -project Harbor.xcodeproj \
-            -scheme "$SCHEME"
+            -scheme "$SCHEME" \
+            -skipPackagePluginValidation
 
       - name: Build unsigned archive
         run: |
@@ -46,6 +47,7 @@ jobs:
             -configuration "$CONFIGURATION" \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Harbor.xcarchive" \
+            -skipPackagePluginValidation \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -56,6 +58,7 @@ jobs:
             -configuration "$CONFIGURATION" \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Harbor.xcarchive" \
+            -skipPackagePluginValidation \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
