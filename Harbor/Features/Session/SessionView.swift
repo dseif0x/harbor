@@ -37,7 +37,8 @@ struct KeyBar: View {
     var body: some View {
         HStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
+                GlassEffectContainer(spacing: 7) {
+                  HStack(spacing: 7) {
                     key("esc") { send("\u{1b}") }
                     key("tab") { send("\t") }
                     key("ctrl", toggle: $ctrlActive)
@@ -56,6 +57,7 @@ struct KeyBar: View {
                     key("^C") { send("\u{03}") }
                     key("^D") { send("\u{04}") }
                     key("^Z") { send("\u{1a}") }
+                  }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)

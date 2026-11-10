@@ -62,17 +62,19 @@ struct TerminalTab: View {
 
     private var sessionBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(sessions.sessions) { s in
-                    sessionChip(s)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    ForEach(sessions.sessions) { s in
+                        sessionChip(s)
+                    }
+                    Button { showPicker = true } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(width: 38, height: 38)
+                            .harborGlass(RoundedRectangle(cornerRadius: 12, style: .continuous), interactive: true)
+                    }
+                    .buttonStyle(.plain)
                 }
-                Button { showPicker = true } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 38, height: 38)
-                        .harborGlass(RoundedRectangle(cornerRadius: 12, style: .continuous), interactive: true)
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
