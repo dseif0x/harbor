@@ -70,7 +70,7 @@ struct TerminalTab: View {
                     Image(systemName: "plus")
                         .font(.system(size: 15, weight: .semibold))
                         .frame(width: 38, height: 38)
-                        .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .harborGlass(RoundedRectangle(cornerRadius: 12, style: .continuous), interactive: true)
                 }
                 .buttonStyle(.plain)
             }
@@ -92,13 +92,11 @@ struct TerminalTab: View {
             .buttonStyle(.plain).foregroundStyle(.secondary)
         }
         .padding(.leading, 12).padding(.trailing, 10).padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isActive ? AnyShapeStyle(s.host.color.color.opacity(0.22)) : AnyShapeStyle(Color(.tertiarySystemFill)))
-        )
+        .harborGlass(RoundedRectangle(cornerRadius: 12, style: .continuous),
+                     tint: isActive ? s.host.color.color : nil, interactive: true)
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(isActive ? s.host.color.color.opacity(0.7) : .clear, lineWidth: 1.5)
+                .strokeBorder(isActive ? s.host.color.color.opacity(0.6) : .clear, lineWidth: 1.5)
         )
         .contentShape(Rectangle())
         .onTapGesture { sessions.active = s }

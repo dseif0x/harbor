@@ -51,10 +51,10 @@ extension HostColor {
 struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
+            .harborGlass(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(0.05), lineWidth: 1)
             )
     }
 }

@@ -12,7 +12,9 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # macos-26 ships Xcode 26 (iOS 26 SDK), which builds the app with Liquid
+    # Glass on the system chrome and lets us call the glass APIs.
+    runs-on: macos-26
     timeout-minutes: 40
     env:
       SCHEME: Harbor

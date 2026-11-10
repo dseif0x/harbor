@@ -84,8 +84,8 @@ struct KeyBar: View {
             Text(label)
                 .font(.system(size: 14, weight: .medium, design: .monospaced))
                 .frame(minWidth: 34, minHeight: 32)
-                .background((toggle?.wrappedValue ?? false) ? AnyShapeStyle(Theme.accent.opacity(0.45)) : AnyShapeStyle(Color(.tertiarySystemFill)),
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .harborGlass(RoundedRectangle(cornerRadius: 9, style: .continuous),
+                             tint: (toggle?.wrappedValue ?? false) ? Theme.accent : nil, interactive: true)
         }
         .buttonStyle(.plain)
     }
@@ -95,7 +95,7 @@ struct KeyBar: View {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .semibold))
                 .frame(minWidth: 34, minHeight: 32)
-                .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .harborGlass(RoundedRectangle(cornerRadius: 9, style: .continuous), interactive: true)
         }
         .buttonStyle(.plain)
     }
