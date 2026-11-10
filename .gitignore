@@ -1,0 +1,31 @@
+# Xcode / Swift
+*.xcodeproj/
+*.xcworkspace/
+!project.yml
+DerivedData/
+build/
+.build/
+*.xcarchive
+*.ipa
+Payload/
+
+# SwiftPM
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# User / editor
+xcuserdata/
+*.swp
+.idea/
+.vscode/
+
+# Secrets — never commit these
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+ExportOptions.plist
+secrets/

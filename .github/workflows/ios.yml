@@ -1,0 +1,82 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      SCHEME: Harbor
+      CONFIGURATION: Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Harbor.xcodeproj \
+            -scheme "$SCHEME"
+
+      - name: Build unsigned archive
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Harbor.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Harbor.xcarchive" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            | xcbeautify || xcodebuild archive \
+            -project Harbor.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Harbor.xcarchive" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH="$RUNNER_TEMP/Harbor.xcarchive/Products/Applications/Harbor.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "::error::Harbor.app not found in archive"; exit 1
+          fi
+          WORK="$RUNNER_TEMP/ipa"
+          mkdir -p "$WORK/Payload"
+          cp -R "$APP_PATH" "$WORK/Payload/"
+          # An unsigned .app still carries a stub signature from SwiftPM binaries;
+          # strip embedded _CodeSignature so the IPA is genuinely unsigned.
+          find "$WORK/Payload" -name _CodeSignature -type d -prune -exec rm -rf {} +
+          ( cd "$WORK" && zip -qry "$RUNNER_TEMP/Harbor-unsigned.ipa" Payload )
+          echo "Built $(du -h "$RUNNER_TEMP/Harbor-unsigned.ipa" | cut -f1) IPA"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Harbor-unsigned-ipa
+          path: ${{ runner.temp }}/Harbor-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
