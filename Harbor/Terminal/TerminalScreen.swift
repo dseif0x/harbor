@@ -8,14 +8,6 @@ final class TerminalController {
     func focus() { _ = view?.becomeFirstResponder() }
 }
 
-/// A terminal that suppresses SwiftTerm's built-in keyboard accessory — Harbor
-/// provides its own (nicer) key bar, so we don't want two stacked rows.
-final class HarborTerminalView: TerminalView {
-    override var inputAccessoryView: UIView? {
-        get { nil }
-        set { }
-    }
-}
 
 /// The terminal font. Fira Code gives a clean, modern monospace; we fall back
 /// to the system monospace if it fails to load. (SwiftTerm renders per cell, so
@@ -37,8 +29,12 @@ struct TerminalScreen: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(session: session) }
 
     func makeUIView(context: Context) -> TerminalView {
-        let view = HarborTerminalView()
+        let view = TerminalView()
         view.terminalDelegate = context.coordinator
+        // Suppress SwiftTerm's built-in keyboard accessory; Harbor shows its own
+        // glass key bar, so we don't want two stacked rows. (setupAccessoryView
+        // runs once during init, so clearing it here is enough.)
+        view.inputAccessoryView = nil
         applyFonts(view)
         view.backgroundColor = Theme.bgUI
         view.nativeBackgroundColor = Theme.bgUI

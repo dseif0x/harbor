@@ -127,7 +127,7 @@ struct TerminalTab: View {
                     Button { fontSize = max(9, fontSize - 1) } label: { Label("Smaller text", systemImage: "textformat.size.smaller") }
                     Divider()
                     Button { showPicker = true } label: { Label("New session", systemImage: "plus") }
-                    if let active { Button { sessions.open(active.host) } label: { Label("Duplicate session", systemImage: "plus.square.on.square") } }
+                    Button { sessions.open(active.host) } label: { Label("Duplicate session", systemImage: "plus.square.on.square") }
                     Divider()
                     Button { showSnippets = true } label: { Label("Snippets", systemImage: "chevron.left.forwardslash.chevron.right") }
                     Button { showSFTP = true } label: { Label("Files (SFTP)", systemImage: "folder") }
