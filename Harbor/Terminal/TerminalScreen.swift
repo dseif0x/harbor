@@ -69,9 +69,6 @@ struct TerminalScreen: UIViewRepresentable {
         view.backgroundColor = Theme.bgUI
         view.nativeBackgroundColor = Theme.bgUI
         view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
-        let term = view.getTerminal()
-        term.backgroundColor = SwiftTerm.Color(red8: 0x15, green8: 0x17, blue8: 0x1C)
-        term.foregroundColor = SwiftTerm.Color(red8: 0xEA, green8: 0xEA, blue8: 0xEC)
     }
 
     final class Coordinator: NSObject, TerminalViewDelegate {
