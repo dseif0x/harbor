@@ -1,13 +1,16 @@
 import SwiftUI
 import SwiftTerm
+import Observation
 
-/// Lets SwiftUI reach into the UIKit terminal (e.g. to dismiss the keyboard).
+/// Lets SwiftUI reach into the UIKit terminal (dismiss the keyboard) and shares
+/// the "ctrl armed" state so a following keystroke becomes a control code.
+@Observable
 final class TerminalController {
-    weak var view: TerminalView?
+    @ObservationIgnored weak var view: TerminalView?
+    var ctrlArmed = false
     func dismissKeyboard() { _ = view?.resignFirstResponder() }
     func focus() { _ = view?.becomeFirstResponder() }
 }
-
 
 /// The terminal font. Fira Code gives a clean, modern monospace; we fall back
 /// to the system monospace if it fails to load. (SwiftTerm renders per cell, so
@@ -26,19 +29,16 @@ struct TerminalScreen: UIViewRepresentable {
     let controller: TerminalController
     var fontSize: CGFloat = 13
 
-    func makeCoordinator() -> Coordinator { Coordinator(session: session) }
+    func makeCoordinator() -> Coordinator { Coordinator(session: session, controller: controller) }
 
     func makeUIView(context: Context) -> TerminalView {
         let view = TerminalView()
         view.terminalDelegate = context.coordinator
         // Suppress SwiftTerm's built-in keyboard accessory; Harbor shows its own
-        // glass key bar, so we don't want two stacked rows. (setupAccessoryView
-        // runs once during init, so clearing it here is enough.)
+        // glass key bar, so we don't want two stacked rows.
         view.inputAccessoryView = nil
         applyFonts(view)
-        view.backgroundColor = Theme.bgUI
-        view.nativeBackgroundColor = Theme.bgUI
-        view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
+        applyColors(view)
         controller.view = view
 
         // Server → terminal.
@@ -52,6 +52,7 @@ struct TerminalScreen: UIViewRepresentable {
 
     func updateUIView(_ uiView: TerminalView, context: Context) {
         applyFonts(uiView)
+        applyColors(uiView)
     }
 
     private func applyFonts(_ view: TerminalView) {
@@ -60,14 +61,49 @@ struct TerminalScreen: UIViewRepresentable {
         view.setFonts(normal: regular, bold: bold, italic: regular, boldItalic: bold)
     }
 
+    /// Paints the terminal with the app's slate background instead of black.
+    /// We set both the view-level native colors (used to clear the surface) and
+    /// the terminal's default cell colors, applied again in updateUIView so a
+    /// late init pass can't reset them to black.
+    private func applyColors(_ view: TerminalView) {
+        view.backgroundColor = Theme.bgUI
+        view.nativeBackgroundColor = Theme.bgUI
+        view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
+        let term = view.getTerminal()
+        term.backgroundColor = SwiftTerm.Color(red8: 0x15, green8: 0x17, blue8: 0x1C)
+        term.foregroundColor = SwiftTerm.Color(red8: 0xEA, green8: 0xEA, blue8: 0xEC)
+    }
+
     final class Coordinator: NSObject, TerminalViewDelegate {
         let session: SSHSession
+        let controller: TerminalController
         weak var terminalView: TerminalView?
-        init(session: SSHSession) { self.session = session }
+        init(session: SSHSession, controller: TerminalController) {
+            self.session = session
+            self.controller = controller
+        }
 
         // SwiftTerm invokes these on the main thread.
         func send(source: TerminalView, data: ArraySlice<UInt8>) {
-            MainActor.assumeIsolated { session.sendToShell(Data(data)) }
+            MainActor.assumeIsolated {
+                var bytes = Array(data)
+                // If ctrl is armed, turn the next single character into its
+                // control code (e.g. ctrl + d -> 0x04), then disarm.
+                if controller.ctrlArmed {
+                    controller.ctrlArmed = false
+                    if bytes.count == 1 { bytes[0] = Self.controlByte(bytes[0]) }
+                }
+                session.sendToShell(Data(bytes))
+            }
+        }
+
+        /// Maps a printable byte to its control code the way a keyboard ctrl does.
+        static func controlByte(_ b: UInt8) -> UInt8 {
+            switch b {
+            case 0x61...0x7a: return b - 0x60   // a-z -> 0x01-0x1a
+            case 0x41...0x5f: return b - 0x40   // @A-Z[\]^_ -> 0x00-0x1f
+            default: return b
+            }
         }
 
         func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {

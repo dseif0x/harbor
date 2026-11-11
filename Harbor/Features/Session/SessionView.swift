@@ -31,8 +31,7 @@ struct SessionPane: View {
 /// The accessory key row with a pinned keyboard-dismiss button.
 struct KeyBar: View {
     let session: SSHSession
-    let terminal: TerminalController
-    @State private var ctrlActive = false
+    @Bindable var terminal: TerminalController
 
     var body: some View {
         HStack(spacing: 0) {
@@ -41,7 +40,7 @@ struct KeyBar: View {
                   HStack(spacing: 7) {
                     key("esc") { send("\u{1b}") }
                     key("tab") { send("\t") }
-                    key("ctrl", toggle: $ctrlActive)
+                    key("ctrl", toggle: $terminal.ctrlArmed)
                     group {
                         key("~") { send("~") }
                         key("/") { send("/") }
@@ -104,9 +103,9 @@ struct KeyBar: View {
 
     private func send(_ s: String) {
         var text = s
-        if ctrlActive, let scalar = s.unicodeScalars.first, scalar.value >= 0x60 {
+        if terminal.ctrlArmed, let scalar = s.unicodeScalars.first, scalar.value >= 0x40 {
             text = String(UnicodeScalar(scalar.value & 0x1f) ?? scalar)
-            ctrlActive = false
+            terminal.ctrlArmed = false
         }
         session.sendToShell(Data(text.utf8))
     }
