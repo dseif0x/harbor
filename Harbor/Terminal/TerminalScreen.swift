@@ -39,6 +39,12 @@ struct TerminalScreen: UIViewRepresentable {
         view.inputAccessoryView = nil
         applyFonts(view)
         applyColors(view)
+        // SwiftTerm's setupOptions() (run during init/layout) copies the native
+        // background into layer.backgroundColor and then resets the native color
+        // to clear — stomping a value we set synchronously here. Re-apply after
+        // the current runloop, once the terminal is fully initialized, so the
+        // setter takes the layer-updating path.
+        DispatchQueue.main.async { [self] in applyColors(view) }
         controller.view = view
 
         // Server → terminal.
@@ -67,8 +73,12 @@ struct TerminalScreen: UIViewRepresentable {
     /// late init pass can't reset them to black.
     private func applyColors(_ view: TerminalView) {
         view.backgroundColor = Theme.bgUI
-        view.nativeBackgroundColor = Theme.bgUI
+        // The solid native background makes SwiftTerm paint both the layer and
+        // (when it uses Metal) the clear colour with our slate; the explicit
+        // layer colour covers the transparent-Metal path too.
         view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
+        view.nativeBackgroundColor = Theme.bgUI
+        view.layer.backgroundColor = Theme.bgUI.cgColor
     }
 
     final class Coordinator: NSObject, TerminalViewDelegate {

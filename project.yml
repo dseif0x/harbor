@@ -21,12 +21,14 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
 
 packages:
+  # Pinned to exact versions the code is written against; SwiftTerm's API moves
+  # between releases, so avoid silent major jumps.
   Citadel:
     url: https://github.com/orlandos-nl/Citadel.git
-    from: "0.7.2"
+    exactVersion: "0.12.1"
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm.git
-    from: "1.2.0"
+    exactVersion: "1.99.3"
 
 targets:
   Harbor:
