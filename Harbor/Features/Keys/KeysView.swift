@@ -23,7 +23,7 @@ struct KeysView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Theme.bg.ignoresSafeArea())
+            .harborBackground()
             .navigationTitle("Keys")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

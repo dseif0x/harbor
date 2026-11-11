@@ -47,7 +47,7 @@ struct SettingsView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Theme.bg.ignoresSafeArea())
+            .harborBackground()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
         }

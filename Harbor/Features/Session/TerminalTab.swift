@@ -37,7 +37,7 @@ struct TerminalTab: View {
                     }
                 }
             }
-            .background(Theme.bg.ignoresSafeArea())
+            .harborBackground()
             .safeAreaInset(edge: .top, spacing: 0) {
                 // Only show the switcher when there's more than one session, so a
                 // single session doesn't stack two bars.

@@ -32,7 +32,7 @@ struct SFTPBrowserView: View {
                 }
             }
         }
-        .background(Theme.bg.ignoresSafeArea())
+        .harborBackground()
         .navigationTitle(folderName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }

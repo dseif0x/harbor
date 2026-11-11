@@ -67,4 +67,11 @@ struct CardBackground: ViewModifier {
 
 extension View {
     func card() -> some View { modifier(CardBackground()) }
+
+    /// Fills the entire screen (under the status bar and tab bar) with the app
+    /// background, placing the view on top. Use on each tab's root so short or
+    /// empty screens aren't black outside their content.
+    func harborBackground() -> some View {
+        ZStack { Theme.bg.ignoresSafeArea(); self }
+    }
 }

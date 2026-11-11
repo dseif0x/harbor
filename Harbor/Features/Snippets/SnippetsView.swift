@@ -23,7 +23,7 @@ struct SnippetsView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Theme.bg.ignoresSafeArea())
+            .harborBackground()
             .navigationTitle("Snippets")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
